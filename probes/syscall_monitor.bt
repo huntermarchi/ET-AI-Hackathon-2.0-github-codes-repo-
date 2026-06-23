@@ -1,0 +1,25 @@
+#!/usr/bin/env bpftrace
+// KernelSentinel — syscall rate monitor
+// Requires: bpftrace >= 0.18, kernel >= 5.8, CAP_BPF
+
+tracepoint:syscalls:sys_enter_openat  { @openat[comm,pid]  = count(); }
+tracepoint:syscalls:sys_enter_read    { @read[comm,pid]    = count(); }
+tracepoint:syscalls:sys_enter_write   { @write[comm,pid]   = count(); }
+tracepoint:syscalls:sys_enter_close   { @close[comm,pid]   = count(); }
+tracepoint:syscalls:sys_enter_connect { @connect[comm,pid] = count();
+    if (@connect[comm,pid] > 50) {
+        printf("LATERAL pid=%d comm=%s count=%d\n",
+               pid, comm, @connect[comm,pid]);
+    }
+}
+tracepoint:syscalls:sys_enter_execve  {
+    printf("EXEC pid=%d ppid=%d comm=%s file=%s\n",
+           pid, curtask->real_parent->pid, comm, str(args->filename));
+}
+
+interval:s:10 {
+    print(@openat); print(@read); print(@write);
+    print(@close);  print(@connect);
+    clear(@openat); clear(@read);  clear(@write);
+    clear(@close);  clear(@connect);
+}
